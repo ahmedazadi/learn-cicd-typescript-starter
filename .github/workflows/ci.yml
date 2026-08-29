@@ -45,7 +45,7 @@ jobs:
           cache: npm
 
       - name: install dependencies
-        run: npm cli
+        run: npm ci
 
       - name: lint check
         run: npm run format:check
