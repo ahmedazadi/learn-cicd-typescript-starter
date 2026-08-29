@@ -3,6 +3,8 @@ name: ci
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 jobs:
   tests:
@@ -16,7 +18,14 @@ jobs:
       - name: Set up node
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24.11.0
+          cache: npm
 
-      - name: Force Failure
-        run: node --version
+      - name: install dependencies
+        run: npm ci
+
+      - name: build
+        run: npm run build
+
+      - name: run unit tests
+        run: npm run test
