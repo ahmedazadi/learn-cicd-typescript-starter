@@ -19,7 +19,7 @@ jobs:
           node-version: 24.11.0
 
       - name: install dependecies
-        run: npm run install
+        run: npm install
 
       - name: run unit tests
         run: npm run test
