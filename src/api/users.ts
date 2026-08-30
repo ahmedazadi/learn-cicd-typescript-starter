@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { respondWithError, respondWithJSON } from "./json.js";
 import { createUser, getUser } from "../db/queries/users.js";
