@@ -1,0 +1,302 @@
+<title>Notely Course Run</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a CI run page. Summary header, then 8 chapter "stages" as a pipeline graph, then a step log for the selected lesson. */
+:root {
+  --bg: #f3f5f8;
+  --panel: #ffffff;
+  --fg: #18202b;
+  --muted: #5d6878;
+  --line: #d7dde6;
+  --accent: #2f55c9;
+  --pass: #1d8a4e;
+  --pass-soft: #e3f3ea;
+  --done: #5f8f73;
+  --run: #b86a00;
+  --run-soft: #fbefd9;
+  --fail: #c23b3b;
+  --queued: #9aa4b2;
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10141b; --panel: #171d26; --fg: #e4e9f0; --muted: #94a0b1; --line: #2a3340;
+    --accent: #7d9cff; --pass: #4cc483; --pass-soft: #173426; --done: #7fae92;
+    --run: #f0a73a; --run-soft: #3a2a10; --fail: #f07070; --queued: #5d6878;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10141b; --panel: #171d26; --fg: #e4e9f0; --muted: #94a0b1; --line: #2a3340;
+  --accent: #7d9cff; --pass: #4cc483; --pass-soft: #173426; --done: #7fae92;
+  --run: #f0a73a; --run-soft: #3a2a10; --fail: #f07070; --queued: #5d6878;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4vw, 40px); line-height: 1.1; margin: 6px 0 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 20px; margin: 0; text-wrap: balance; }
+.head { display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: end; justify-content: space-between; }
+.head p { margin: 8px 0 0; color: var(--muted); max-width: 60ch; }
+.stats { display: flex; gap: 28px; flex-wrap: wrap; }
+.stat b { display: block; font-family: var(--display); font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+
+/* segmented progress bar: one segment per lesson, grouped by chapter */
+.bar { display: flex; gap: 6px; }
+.bar .grp { display: flex; gap: 2px; flex: var(--n) 1 0; min-width: 0; }
+.bar i { flex: 1; height: 10px; border-radius: 2px; background: var(--line); }
+.bar i.verified { background: var(--pass); }
+.bar i.done { background: var(--done); }
+.bar i.current { background: var(--run); }
+.bar i.failed { background: var(--fail); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* pipeline graph */
+.pipe-scroll { overflow-x: auto; padding-bottom: 6px; }
+.pipe { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(208px, 1fr); gap: 22px; min-width: min-content; }
+.stage { position: relative; display: grid; gap: 8px; align-content: start; }
+.stage + .stage::before {
+  content: ""; position: absolute; left: -22px; top: 14px; width: 22px; height: 2px; background: var(--line);
+}
+.stage-h { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.stage-h .n { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.stage-h h3 { font-family: var(--display); font-size: 16px; font-weight: 700; margin: 0; flex: 1; }
+.stage-h .ct { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.steps { display: grid; gap: 6px; }
+.step {
+  display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; text-align: left;
+  width: 100%; padding: 8px 10px; background: var(--panel); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 14px; cursor: pointer;
+}
+.step:hover { border-color: var(--muted); }
+.step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.step[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.step.current { background: var(--run-soft); border-color: var(--run); }
+.step .t { min-width: 0; }
+.step .t small { display: block; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.step.queued .t > span { color: var(--muted); }
+
+.ico { width: 18px; height: 18px; margin-top: 1px; display: block; }
+.ico.verified, .ico.done { color: var(--pass); }
+.ico.done { color: var(--done); }
+.ico.current { color: var(--run); }
+.ico.failed { color: var(--fail); }
+.ico.queued { color: var(--queued); }
+@media (prefers-reduced-motion: no-preference) { .ico.current circle.spin { animation: spin 1.4s linear infinite; transform-origin: 9px 9px; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* step log */
+.log { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.log-h { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.log-h h2 { flex: 1; min-width: 0; }
+.pill { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.verified { color: var(--pass); } .pill.done { color: var(--done); } .pill.current { color: var(--run); }
+.pill.failed { color: var(--fail); } .pill.queued { color: var(--muted); }
+.log-b { padding: 14px 18px 18px; display: grid; gap: 10px; }
+.log-b pre { margin: 0; font-family: var(--mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--fg); }
+.log-b .meta { font-size: 13px; color: var(--muted); }
+.log-b a { color: var(--accent); }
+.note { font-size: 13px; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .pipe { grid-auto-flow: row; grid-auto-columns: auto; min-width: 0; }
+  .stage + .stage::before { left: 8px; top: -22px; width: 2px; height: 22px; }
+  .pipe { gap: 22px; }
+}
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="eyebrow">boot.dev · Learn CI/CD with GitHub Actions, Docker and TypeScript</div>
+      <h1>Notely course run</h1>
+      <p id="sub">Loading progress…</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="s-pass">–</b><span>lessons passed</span></div>
+      <div class="stat"><b id="s-left">–</b><span>lessons left</span></div>
+      <div class="stat"><b id="s-ch">–</b><span>chapters cleared</span></div>
+    </div>
+  </header>
+
+  <div>
+    <div class="bar" id="bar" aria-hidden="true"></div>
+  </div>
+  <div class="legend" id="legend"></div>
+
+  <div class="pipe-scroll"><div class="pipe" id="pipe"></div></div>
+
+  <section class="log" aria-live="polite">
+    <div class="log-h"><h2 id="l-title">Select a lesson</h2><span id="l-pill" class="pill queued" hidden></span></div>
+    <div class="log-b">
+      <div class="meta" id="l-meta"></div>
+      <pre id="l-body">Click any step above to see how it was checked.</pre>
+    </div>
+  </section>
+
+  <p class="note" id="foot">Claude updates this page as it checks your work against each lesson's listed checks. “Verified” means Claude ran the check; “Done” means the work is in your repo history but wasn't rechecked lesson by lesson.</p>
+</div>
+
+<script>
+const COURSE = [
+  ["Continuous Integration", [
+    ["0b6e054e-33ea-4ee9-83f0-438270b0c664","github","Welcome to 'Learn CI/CD'"],
+    ["cdd1d1dd-5f2f-4f9e-a8d1-ab0c091410bd","cli","Run Notely"],
+    ["19a39196-390c-4e12-be63-3eeffdd17807","github","Branches"],
+    ["10bc0add-3ff6-46e0-b968-691b80096b56","github","Pull Requests"],
+    ["214c418f-378a-4533-a519-23c2408457c7","github","Continuous Integration"],
+    ["365ec078-0f30-4a07-bb2d-5eaca68b8ec6","github","Breakdown of GitHub Actions"],
+    ["462884d7-94b6-4e37-b6ad-e4177a34d94d","quiz","GitHub Actions"]]],
+  ["Tests", [
+    ["252aa13f-6793-492f-b9e3-4337ef05bd45","cli","Running Tests"],
+    ["f2c5bf21-e987-44fb-9377-ffed5f08f1af","github","Tests on CI"],
+    ["7b59507d-f571-49ed-a090-30a3494801db","github","Code Coverage"],
+    ["2792f45b-d92c-46f6-b0c1-13546d3b769d","github","README Badge for Tests"]]],
+  ["Formatting", [
+    ["11d6d039-da00-40bc-95a1-6093653ac0b3","cli","Formatting"],
+    ["e266196a-9da9-4945-880b-1b71199057f1","github","Formatting CI"]]],
+  ["Linting", [
+    ["dd042cdc-f269-4a49-8d46-62f31fc64d2f","cli","Linting"],
+    ["a6b18c95-ad13-4690-847b-2a3e6f3bd7db","github","CI Linting"],
+    ["24b8f997-d775-44b7-bf45-6a46b4908775","quiz","Linting Review"]]],
+  ["Security", [
+    ["ffac9923-534e-4cb9-9feb-17e0a154feff","cli","Security Checks"],
+    ["db7e09cb-3667-46b9-b69b-fede0e526571","github","CI Security"],
+    ["2e22e960-a701-42b9-b5e5-23e3368b4e45","github","Fix Security Issues"],
+    ["c98e193d-1944-4290-855f-506544ffd354","quiz","Security Review"]]],
+  ["Build", [
+    ["b0a16bb9-77e4-4b34-b19e-3d553d51df05","cli","Docker"],
+    ["16e4e036-bccc-4eac-bcc7-bd94274ba5c9","github","Continuous Deployment"],
+    ["4a3fd4c0-80a3-4b65-b376-903ea159298b","quiz","Google Cloud Platform"],
+    ["a5072e61-2660-46f8-90a9-f18314258340","cli","Google Cloud SDK"],
+    ["8875b5bd-728a-4f37-9b02-728ac2e9767c","cli","Google Artifact Registry"],
+    ["feb32180-c84a-11f1-9b00-5ef83a3c2155","cli","Workload Identity Federation"],
+    ["e9945323-6052-4e67-86f5-a8ff6cff610b","github","Automate Builds"]]],
+  ["Deploy", [
+    ["9f7438a3-868c-4ad0-aa46-59d156961087","cli","Google Cloud Run"],
+    ["36342625-14f5-4b89-ad0d-d959beb29584","quiz","Cloud Run Review"],
+    ["078034c9-a395-4f32-a290-472465ad0e50","quiz","Delete the Test"],
+    ["a29f58f8-c7c9-4a77-ad7a-9bf142cda6ee","cli","Cloud Run Custom"],
+    ["c714a6be-f36b-4e89-92c8-5399f9d4f54d","cli","Cloud Run Updates"]]],
+  ["Database", [
+    ["fc5dd86b-3294-40dc-b11e-539967b2a709","cli","Turso"],
+    ["806979a4-2390-4efb-9df4-b92cbf6d00ad","quiz","Migrations"],
+    ["59fdced8-6d15-4c63-a575-56b5d22cc640","github","Migrate Automatically"],
+    ["35e34fae-5462-4686-a137-78282edc7023","cli","Using the DB"],
+    ["79d0fb0c-1347-4b78-8f87-f7527f425f26","quiz","CI/CD Review"]]],
+];
+const KIND = { cli: "CLI check", github: "GitHub check", quiz: "Quiz" };
+const LABEL = { verified: "Verified", done: "Done", current: "In progress", failed: "Failing", queued: "Not started" };
+const PASSED = s => s === "verified" || s === "done";
+
+const ICONS = {
+  verified: '<svg class="ico verified" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="currentColor"/><path d="M5.2 9.3l2.4 2.4 5-5.1" stroke="var(--panel)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  done: '<svg class="ico done" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.25" stroke="currentColor" stroke-width="1.5"/><path d="M5.6 9.3l2.2 2.2 4.6-4.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  current: '<svg class="ico current" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.25" stroke="currentColor" stroke-opacity=".25" stroke-width="1.5"/><circle class="spin" cx="9" cy="9" r="7.25" stroke="currentColor" stroke-width="1.5" stroke-dasharray="12 34" stroke-linecap="round"/><circle cx="9" cy="9" r="2.6" fill="currentColor"/></svg>',
+  failed: '<svg class="ico failed" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="currentColor"/><path d="M6.2 6.2l5.6 5.6M11.8 6.2l-5.6 5.6" stroke="var(--panel)" stroke-width="2" stroke-linecap="round"/></svg>',
+  queued: '<svg class="ico queued" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.25" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3"/></svg>',
+};
+
+let progress = {};
+let selected = null;
+const $ = id => document.getElementById(id);
+const statusOf = uuid => (progress[uuid] && progress[uuid].status) || "queued";
+
+function render() {
+  const all = COURSE.flatMap(([, ls]) => ls);
+  const passed = all.filter(l => PASSED(statusOf(l[0]))).length;
+  const cleared = COURSE.filter(([, ls]) => ls.every(l => PASSED(statusOf(l[0])))).length;
+  $("s-pass").textContent = passed + "/" + all.length;
+  $("s-left").textContent = all.length - passed;
+  $("s-ch").textContent = cleared + "/" + COURSE.length;
+
+  let cur = null;
+  COURSE.forEach(([ch, ls], ci) => ls.forEach((l, li) => { if (!cur && statusOf(l[0]) === "current") cur = { ch, ci, li, l }; }));
+  $("sub").textContent = cur
+    ? `Now on chapter ${cur.ci + 1} · lesson ${cur.li + 1}: ${cur.l[2]} (${cur.ch}).`
+    : (Object.keys(progress).length ? "No lesson marked in progress." : "No progress recorded yet. Claude adds each lesson here as it checks your work.");
+
+  const bar = $("bar"); bar.textContent = "";
+  COURSE.forEach(([, ls]) => {
+    const g = document.createElement("div"); g.className = "grp"; g.style.setProperty("--n", ls.length);
+    ls.forEach(l => { const i = document.createElement("i"); i.className = statusOf(l[0]); g.appendChild(i); });
+    bar.appendChild(g);
+  });
+
+  const pipe = $("pipe"); pipe.textContent = "";
+  COURSE.forEach(([ch, ls], ci) => {
+    const st = document.createElement("section"); st.className = "stage";
+    const n = ls.filter(l => PASSED(statusOf(l[0]))).length;
+    const stageStatus = n === ls.length ? "verified" : ls.some(l => statusOf(l[0]) === "current") ? "current" : n ? "done" : "queued";
+    st.innerHTML = `<div class="stage-h">${ICONS[stageStatus]}<span class="n">CH${ci + 1}</span><h3></h3><span class="ct">${n}/${ls.length}</span></div><div class="steps"></div>`;
+    st.querySelector("h3").textContent = ch;
+    const steps = st.querySelector(".steps");
+    ls.forEach((l, li) => {
+      const s = statusOf(l[0]);
+      const b = document.createElement("button");
+      b.className = "step " + s; b.type = "button";
+      b.setAttribute("aria-pressed", selected === l[0] ? "true" : "false");
+      b.innerHTML = ICONS[s] + '<span class="t"><span></span><small></small></span>';
+      b.querySelector(".t > span").textContent = l[2];
+      b.querySelector("small").textContent = `L${li + 1} · ${KIND[l[1]]}`;
+      b.setAttribute("aria-label", `${l[2]}, ${LABEL[s]}`);
+      b.addEventListener("click", () => { selected = l[0]; render(); });
+      steps.appendChild(b);
+    });
+    pipe.appendChild(st);
+  });
+
+  if (!selected && cur) selected = cur.l[0];
+  showLog();
+}
+
+function showLog() {
+  if (!selected) return;
+  let found;
+  COURSE.forEach(([ch, ls], ci) => ls.forEach((l, li) => { if (l[0] === selected) found = { ch, ci, li, l }; }));
+  if (!found) return;
+  const p = progress[selected] || {};
+  const s = statusOf(selected);
+  $("l-title").textContent = `CH${found.ci + 1} · L${found.li + 1}  ${found.l[2]}`;
+  const pill = $("l-pill"); pill.hidden = false; pill.className = "pill " + s; pill.textContent = LABEL[s];
+  const meta = $("l-meta"); meta.textContent = "";
+  meta.append(`${found.ch} · ${KIND[found.l[1]]}${p.checkedAt ? " · checked " + p.checkedAt : ""} · `);
+  const a = document.createElement("a");
+  a.href = "https://www.boot.dev/lessons/" + found.l[0]; a.target = "_blank"; a.rel = "noopener";
+  a.textContent = "Open lesson";
+  meta.appendChild(a);
+  $("l-body").textContent = p.evidence || (s === "queued" ? "Not started yet." : "No notes recorded.");
+}
+
+const LEGEND = ["verified", "done", "current", "failed", "queued"];
+$("legend").innerHTML = LEGEND.map(s => `<span>${ICONS[s]}${LABEL[s]}</span>`).join("");
+render();
+
+(async () => {
+  const timer = setTimeout(() => { if (!Object.keys(progress).length) $("sub").textContent = "Progress can't be reached right now. Showing the course outline."; }, 10000);
+  const db = window.claude ? await window.claude.use("db") : null;
+  if (!db) { clearTimeout(timer); $("sub").textContent = "Sign in to claude.ai to see recorded progress. Showing the course outline."; return; }
+  db.collection("progress").onSnapshot(snap => {
+    if (!snap.metadata.fromCache) clearTimeout(timer);
+    const next = {};
+    snap.docs.forEach(d => { next[d.id] = d.data(); });
+    progress = next;
+    render();
+  }, () => { clearTimeout(timer); $("sub").textContent = "Progress stopped updating. Reload the page to try again."; });
+})();
+</script>
