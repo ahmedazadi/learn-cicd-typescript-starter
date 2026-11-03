@@ -52,8 +52,8 @@ jobs:
 
       - name: Push the image to registry
         run: |
-          ghcr.io/ahmedazadi/notely:latest
-          ghcr.io/ahmedazadi/notely:${{ github.sha }}
+          docker push ghcr.io/ahmedazadi/notely:latest
+          docker push ghcr.io/ahmedazadi/notely:${{ github.sha }}
 
       - name: Notify Railway
         env:
