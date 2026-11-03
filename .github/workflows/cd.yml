@@ -48,7 +48,7 @@ jobs:
             ghcr.io/ahmedazadi/notely:${{ github.sha }}
 
       - name: Migration
-        run: npm run db:generate
+        run: npm run db:migrate
 
       - name: Push the image to registry
         run: |
