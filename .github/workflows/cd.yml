@@ -13,6 +13,9 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -35,13 +38,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build the image
         uses: docker/build-push-action@v6
         with:
-          push: true
+          push: false
+          load: true
           tags: |
             ghcr.io/ahmedazadi/notely:latest
             ghcr.io/ahmedazadi/notely:${{ github.sha }}
+
+      - name: Migration
+        run: npm run db:generate
+
+      - name: Push the image to registry
+        run: |
+          ghcr.io/ahmedazadi/notely:latest
+          ghcr.io/ahmedazadi/notely:${{ github.sha }}
 
       - name: Notify Railway
         env:
