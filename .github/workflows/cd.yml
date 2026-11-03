@@ -38,3 +38,8 @@ jobs:
           tags: |
             ghcr.io/ahmedazadi/notely:latest
             ghcr.io/ahmedazadi/notely:${{ github.sha }}
+
+      - name: Notify Railway
+        run: |
+          npm i -g @railway/cli
+          RAILWAY_TOKEN${{secrets.RAILWAY_TOKEN}} railway redeploy --service --yes
