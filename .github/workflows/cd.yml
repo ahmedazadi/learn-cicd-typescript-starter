@@ -40,6 +40,8 @@ jobs:
             ghcr.io/ahmedazadi/notely:${{ github.sha }}
 
       - name: Notify Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           npm i -g @railway/cli
-          RAILWAY_TOKEN=${{ secrets.RAILWAY_TOKEN }} railway redeploy --service notely --yes
+          railway redeploy --service notely --yes
